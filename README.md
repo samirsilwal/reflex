@@ -175,38 +175,43 @@ components:
 ```
 reflex/
 ├── action.yml                       # composite GitHub Action
+├── pyproject.toml                   # packaging (src-layout, editable-installable)
+├── requirements.txt                 # pinned runtime deps (used by CI/dev venvs)
 ├── reflex.config.example.yml        # minimal component → adapter config
 ├── reflex.config.laudio-example.yml # modeled on the actual ~/laudio repos (see below)
-├── requirements.txt
 ├── models/
 │   └── laya-english/          # bundled Laya model (Git LFS, see .gitattributes)
-├── reflex/
-│   ├── models.py              # TestUnit, Component dataclasses
-│   ├── config.py              # load reflex.config.yml, bundled-model auto-detect
-│   ├── diffutil.py            # git diff + component mapping
-│   ├── classifier.py          # Laya noul wrapper, suite-level batching
-│   ├── junit.py                # JUnit XML reader, used by shadow mode
-│   ├── select.py               # CLI entrypoint / orchestrator + shadow mode
-│   ├── adapters/
-│   │   ├── base.py            # Adapter protocol
-│   │   ├── pytest_adapter.py
-│   │   ├── jest_adapter.py
-│   │   ├── mocha_adapter.py
-│   │   ├── vitest_adapter.py
-│   │   ├── playwright_adapter.py       # plain @playwright/test
-│   │   └── playwright_bdd_adapter.py   # .feature + playwright-bdd
-│   └── graph/
-│       ├── python_graph.py    # ast-based import graph
-│       └── js_graph.py        # madge-based import graph
+├── src/
+│   └── reflex/                # the actual Python package (import reflex.xxx)
+│       ├── models.py          # TestUnit, Component dataclasses
+│       ├── config.py          # load reflex.config.yml, bundled-model auto-detect
+│       ├── diffutil.py        # git diff + component mapping
+│       ├── classifier.py      # Laya noul wrapper, suite-level batching
+│       ├── junit.py           # JUnit XML reader, used by shadow mode
+│       ├── select.py          # CLI entrypoint / orchestrator + shadow mode
+│       ├── adapters/
+│       │   ├── base.py            # Adapter protocol
+│       │   ├── pytest_adapter.py
+│       │   ├── jest_adapter.py
+│       │   ├── mocha_adapter.py
+│       │   ├── vitest_adapter.py
+│       │   ├── playwright_adapter.py       # plain @playwright/test
+│       │   └── playwright_bdd_adapter.py   # .feature + playwright-bdd
+│       └── graph/
+│           ├── python_graph.py    # ast-based import graph
+│           └── js_graph.py        # madge-based import graph
 └── tests/
     ├── test_select.py         # selection-logic unit tests (Laya mocked)
     └── test_config.py         # config parsing, dependents-propagation tests
 ```
 
-Everything under this one `reflex/` folder is self-contained and can be
-pushed to its own repo as-is — `models/laya-english/` (~820MB) is tracked
-via Git LFS (`.gitattributes`), so a normal `git clone` still pulls it
-without any external/absolute path configuration.
+The repo root and the importable package are deliberately **not** the same
+name at the same level (no `reflex/reflex/...` nesting) — the package lives
+under `src/reflex/` (standard Python "src layout"), installed via
+`pip install -e .` (`pyproject.toml`). Everything here is self-contained and
+can be pushed to its own repo as-is — `models/laya-english/` (~820MB) is
+tracked via Git LFS (`.gitattributes`), so a normal `git clone` still pulls
+it without any external/absolute path configuration.
 
 ## Usage
 

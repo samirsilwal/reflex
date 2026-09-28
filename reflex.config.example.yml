@@ -1,0 +1,48 @@
+settings:
+  # Optional. Reflex auto-detects its own bundled model at
+  # reflex/models/laya-english/ when this is omitted — no external path
+  # needed for a standalone checkout. Only set this to point at a
+  # different/external model.
+  # model_path: /some/other/laya-model
+  threshold: 0.5
+
+components:
+  web-app:
+    path: web-app/
+    adapter: jest
+    dependents: []
+
+  backend:
+    path: backend/
+    adapter: pytest
+    dependents: []
+
+  core:
+    path: core/
+    adapter: pytest
+    foundational: true       # any change here -> full suite for all dependents
+    dependents: [backend, web-app]
+
+  util:
+    path: util/
+    adapter: pytest
+    foundational: true
+    dependents: [backend, web-app, core]
+
+  e2e:
+    path: e2e/
+    adapter: playwright-bdd
+    # adapter_options are forwarded verbatim as kwargs to the adapter's
+    # constructor, so repo-specific conventions live in config, not code.
+    adapter_options:
+      features_dir: e2e/features
+      generated_dir: .features-gen/e2e
+
+  custom-service:
+    path: services/custom/
+    # Not one of Reflex's built-in adapters — dynamically imported instead.
+    # Must be an import path resolvable in the Action's Python environment.
+    adapter: myorg.reflex_adapters.gotest:GoTestAdapter
+    adapter_options:
+      go_bin: go
+

@@ -1,0 +1,72 @@
+name: "Reflex"
+description: >
+  Language-agnostic PR test selection using static import graphs + a Laya
+  semantic fallback, so CI only runs test suites actually affected by the diff.
+inputs:
+  config:
+    description: "Path to reflex.config.yml"
+    required: false
+    default: "reflex.config.yml"
+  base-ref:
+    description: "Base git ref to diff against (e.g. origin/main or the PR base SHA)"
+    required: true
+  model-path:
+    description: "Local path (or HF repo id) to a Laya model. Leave empty to use Reflex's own bundled model (reflex/models/laya-english) if present, or disable the semantic fallback entirely (static-graph + foundational rules only) if no model is bundled."
+    required: false
+    default: ""
+  threshold:
+    description: "Laya noul probability threshold for including a suite"
+    required: false
+    default: "0.5"
+  shadow:
+    description: "If true, compute and print the selection but always run the full suite (safe rollout mode)"
+    required: false
+    default: "false"
+  run-all:
+    description: "If true, force full suite for every component (e.g. from a PR label override)"
+    required: false
+    default: "false"
+outputs:
+  summary:
+    description: "Path to the written selection summary (also appended to GITHUB_STEP_SUMMARY)"
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Cache Reflex deps
+      uses: actions/cache@v4
+      with:
+        path: |
+          ${{ github.action_path }}/.venv
+        key: reflex-${{ runner.os }}-${{ hashFiles(format('{0}/pyproject.toml', github.action_path)) }}
+
+    - name: Install Reflex
+      shell: bash
+      run: |
+        python -m venv "${{ github.action_path }}/.venv"
+        "${{ github.action_path }}/.venv/bin/pip" install -q "${{ github.action_path }}"
+
+    - name: Fetch full history for diff
+      shell: bash
+      run: git fetch --no-tags --depth=1 origin "${{ inputs.base-ref }}" || true
+
+    - name: Run Reflex selection (and execute tests)
+      shell: bash
+      env:
+        RUN_ALL_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'run-all-tests') }}
+      run: |
+        ARGS=(--config "${{ inputs.config }}" --base-ref "${{ inputs.base-ref }}" --execute)
+        if [ -n "${{ inputs.model-path }}" ]; then
+          ARGS+=(--model-path "${{ inputs.model-path }}" --threshold "${{ inputs.threshold }}")
+        fi
+        if [ "${{ inputs.shadow }}" = "true" ]; then
+          ARGS+=(--shadow)
+        fi
+        if [ "${{ inputs.run-all }}" = "true" ] || [ "$RUN_ALL_LABEL" = "true" ]; then
+          ARGS+=(--run-all)
+        fi
+        "${{ github.action_path }}/.venv/bin/python" -m reflex.select "${ARGS[@]}"

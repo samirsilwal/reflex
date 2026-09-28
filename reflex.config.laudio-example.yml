@@ -1,0 +1,75 @@
+settings:
+  # Reflex auto-detects its own bundled model at reflex/models/laya-english/
+  # by default — leave model_path unset unless you want to point at a
+  # different model.
+  threshold: 0.5
+
+components:
+  web-app:
+    path: web-app/
+    adapter: jest             # unit tests (scripts/test.js -> jest)
+    dependents: []
+  web-app-e2e:
+    path: web-app/playwright/
+    adapter: playwright-bdd   # e2e/features/*.feature + e2e/steps/*, playwright-bdd
+    adapter_options:
+      features_dir: e2e/features
+      generated_dir: .features-gen/e2e
+    dependents: []
+
+  backend:
+    path: backend/
+    adapter: mocha
+    dependents: []
+  backend-nango:
+    path: backend/nango-integrations/
+    adapter: mocha
+    dependents: []
+  backend-api-tests:
+    path: backend/playwright/
+    adapter: playwright        # plain @playwright/test, no playwright-bdd dep
+    dependents: []
+
+  core:
+    path: core/
+    adapter: mocha
+    foundational: true         # shared across backend + docker
+    # NOTE: 'lambda' also consumes core but has no test suite of its own
+    # (see exclusions below) so it isn't listed as a dependent here — add
+    # it once/if lambda gets its own adapter entry.
+    dependents: [backend]
+
+  util:
+    path: util/
+    adapter: pytest
+    foundational: true
+    dependents: [backend, aws-mwaa-pipeline]
+
+  nova:
+    path: nova/
+    adapter: vitest            # design system components
+    foundational: true         # consumed by web-app + forms-app
+    dependents: [web-app, forms-app]
+
+  forms-app:
+    path: forms-app/
+    adapter: vitest
+    dependents: []
+
+  aws-mwaa-pipeline:
+    path: aws-mwaa-pipeline/
+    adapter: pytest
+    dependents: []
+
+# Intentionally NOT covered by an adapter (see reflex/README.md "Repos scanned"):
+#   db/{app,inngest,phi}, analytics — SQL migrations, no test suite of their
+#     own; changes here should be handled via a 'foundational'-style rule in
+#     the *consuming* repo's config (e.g. backend), not a Reflex adapter.
+#   discovery/load-test        — k6 load/perf tests, not PR-gated correctness
+#     tests; out of scope for diff-based selection.
+#   discovery/fine-tune-LLms   — ML experimentation, no test suite.
+#   licenser, discovery/outlook-add-in — no test suite configured.
+#   sdlc-infrastructure, core-infrastructure, terraform-modules — plain
+#     Terraform, no .tftest.hcl/test suite present yet.
+#   lambda — consumes 'core' but has no test suite of its own yet; not
+#     listed as a 'dependents' target below for that reason (see 'core').
