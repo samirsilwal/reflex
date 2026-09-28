@@ -32,6 +32,31 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: Checkout Reflex (with Git LFS for the bundled model)
+      uses: actions/checkout@v4
+      with:
+        repository: samirsilwal/reflex
+        ref: main
+        lfs: false          # skip LFS on the plain checkout; we restore/pull it below
+        path: .reflex-tool
+
+    # The model virtually never changes between PR runs, so we cache the
+    # already-pulled LFS blob keyed on the LFS pointer's own oid (not the
+    # commit SHA) — a cache hit here means we skip the LFS transfer (the
+    # slow, ~15-40s part) entirely and just restore from cache instead.
+    - name: Restore cached Laya model
+      id: model-cache
+      uses: actions/cache@v4
+      with:
+        path: .reflex-tool/models/laya-english
+        key: reflex-model-${{ hashFiles('.reflex-tool/models/laya-english/model.safetensors') }}
+
+    - name: Pull Laya model via Git LFS (cache miss only)
+      if: steps.model-cache.outputs.cache-hit != 'true'
+      working-directory: .reflex-tool
+      shell: bash
+      run: git lfs pull --include="models/laya-english/**"
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -41,14 +66,14 @@ runs:
       uses: actions/cache@v4
       with:
         path: |
-          ${{ github.action_path }}/.venv
-        key: reflex-${{ runner.os }}-${{ hashFiles(format('{0}/pyproject.toml', github.action_path)) }}
+          .reflex-tool/.venv
+        key: reflex-${{ runner.os }}-${{ hashFiles('.reflex-tool/pyproject.toml') }}
 
     - name: Install Reflex
       shell: bash
       run: |
-        python -m venv "${{ github.action_path }}/.venv"
-        "${{ github.action_path }}/.venv/bin/pip" install -q "${{ github.action_path }}"
+        python -m venv .reflex-tool/.venv
+        .reflex-tool/.venv/bin/pip install -q .reflex-tool
 
     - name: Fetch full history for diff
       shell: bash
@@ -69,4 +94,4 @@ runs:
         if [ "${{ inputs.run-all }}" = "true" ] || [ "$RUN_ALL_LABEL" = "true" ]; then
           ARGS+=(--run-all)
         fi
-        "${{ github.action_path }}/.venv/bin/python" -m reflex.select "${ARGS[@]}"
+        .reflex-tool/.venv/bin/python -m reflex.select "${ARGS[@]}"
